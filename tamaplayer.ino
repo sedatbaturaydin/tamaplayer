@@ -1,11 +1,16 @@
 #include "Config.h"
 #include "AppState.h"
+#include "Theme.h"
 #include "DisplayManager.h"
 #include "HomePage.h"
 #include "Pages.h"
+#include "PetPage.h"
+#include "PetState.h"
+#include "SettingsPage.h"
 
 AppState currentPage = PAGE_HOME;
 int homeSelectedIndex = 0;
+int settingsSelectedTheme = 0;
 
 bool lastReading = HIGH;
 bool stableButtonState = HIGH;
@@ -16,6 +21,11 @@ bool longPressHandled = false;
 void renderCurrentPage() {
   if (currentPage == PAGE_HOME) {
     drawHomePage(homeSelectedIndex);
+  } else if (currentPage == PAGE_PET) {
+    drawPetPage();
+    petClearRedrawFlag();
+  } else if (currentPage == PAGE_SETTINGS) {
+    drawSettingsPage(settingsSelectedTheme);
   } else {
     drawPage(currentPage);
   }
@@ -25,26 +35,35 @@ AppState menuIndexToPage(int index) {
   switch (index) {
     case 0: return PAGE_PET;
     case 1: return PAGE_MUSIC;
-    case 2: return PAGE_STATUS;
-    case 3: return PAGE_SETTINGS;
+    case 2: return PAGE_SETTINGS;
     default: return PAGE_HOME;
   }
 }
 
 void handleShortPress() {
   if (currentPage == PAGE_HOME) {
-    homeSelectedIndex++;
-    if (homeSelectedIndex >= getHomeMenuCount()) {
-      homeSelectedIndex = 0;
-    }
+    homeSelectedIndex = (homeSelectedIndex + 1) % getHomeMenuCount();
     drawHomePage(homeSelectedIndex);
+  } else if (currentPage == PAGE_PET) {
+    petHandleAction(PET_ACTION_INTERACT);
+    // redraw handled in loop()
+  } else if (currentPage == PAGE_SETTINGS) {
+    settingsSelectedTheme = (settingsSelectedTheme + 1) % THEME_COUNT;
+    drawSettingsPage(settingsSelectedTheme);
   }
 }
 
 void handleLongPress() {
   if (currentPage == PAGE_HOME) {
-    currentPage = menuIndexToPage(homeSelectedIndex);
+    AppState next = menuIndexToPage(homeSelectedIndex);
+    if (next == PAGE_SETTINGS) {
+      settingsSelectedTheme = currentThemeIndex;
+    }
+    currentPage = next;
   } else {
+    if (currentPage == PAGE_SETTINGS) {
+      applyTheme(settingsSelectedTheme);
+    }
     currentPage = PAGE_HOME;
   }
 
@@ -87,10 +106,20 @@ void setup() {
   Serial.begin(115200);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
 
+  petInit();
   initDisplay();
   renderCurrentPage();
 }
 
 void loop() {
   updateButton();
+
+  // Pet stats decay regardless of which page is visible
+  petUpdate();
+
+  // Redraw pet page if stats changed while it's open
+  if (currentPage == PAGE_PET && petNeedsRedraw()) {
+    drawPetPage();
+    petClearRedrawFlag();
+  }
 }

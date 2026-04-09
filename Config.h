@@ -17,3 +17,4 @@
 // Buton timing
 #define DEBOUNCE_DELAY 50
 #define LONG_PRESS_TIME 700
+
