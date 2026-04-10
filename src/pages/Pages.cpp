@@ -1,6 +1,6 @@
 #include "Pages.h"
-#include "DisplayManager.h"
-#include "Theme.h"
+#include "../display/DisplayManager.h"
+#include "../display/Theme.h"
 
 static int centerX(const char* text, uint8_t textSize) {
   int px = strlen(text) * 6 * textSize;

@@ -1,6 +1,6 @@
 #include "HomePage.h"
-#include "DisplayManager.h"
-#include "Theme.h"
+#include "../display/DisplayManager.h"
+#include "../display/Theme.h"
 
 static const char* menuItems[] = {
   "pet",

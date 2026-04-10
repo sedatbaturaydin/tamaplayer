@@ -39,9 +39,9 @@ void petHandleAction(PetAction action) {
 }
 
 PetMood petGetMood() {
+  if (petStats.happiness >= 7) return PET_MOOD_HAPPY;
   if (petStats.hunger    >= 8) return PET_MOOD_HUNGRY;
   if (petStats.happiness <= 2) return PET_MOOD_SAD;
-  if (petStats.happiness >= 7) return PET_MOOD_HAPPY;
   return PET_MOOD_NEUTRAL;
 }
 

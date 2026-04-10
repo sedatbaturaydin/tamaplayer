@@ -1,7 +1,7 @@
 #include "PetPage.h"
-#include "DisplayManager.h"
-#include "Theme.h"
-#include "PetState.h"
+#include "../display/DisplayManager.h"
+#include "../display/Theme.h"
+#include "../pet/PetState.h"
 #include <string.h>
 
 static const uint16_t COL_WHITE = 0xFFFF;

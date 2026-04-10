@@ -1,6 +1,6 @@
 #include "SettingsPage.h"
-#include "DisplayManager.h"
-#include "Theme.h"
+#include "../display/DisplayManager.h"
+#include "../display/Theme.h"
 
 void drawSettingsPage(int selectedTheme) {
   tft.fillScreen(activeTheme->bg);

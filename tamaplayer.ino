@@ -1,12 +1,12 @@
 #include "Config.h"
 #include "AppState.h"
-#include "Theme.h"
-#include "DisplayManager.h"
-#include "HomePage.h"
-#include "Pages.h"
-#include "PetPage.h"
-#include "PetState.h"
-#include "SettingsPage.h"
+#include "src/display/Theme.h"
+#include "src/display/DisplayManager.h"
+#include "src/pages/HomePage.h"
+#include "src/pages/Pages.h"
+#include "src/pages/PetPage.h"
+#include "src/pet/PetState.h"
+#include "src/pages/SettingsPage.h"
 
 AppState currentPage = PAGE_HOME;
 int homeSelectedIndex = 0;
