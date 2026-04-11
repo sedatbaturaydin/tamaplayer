@@ -1,4 +1,5 @@
 #include "Pages.h"
+#include "MusicPage.h"
 #include "../display/DisplayManager.h"
 #include "../display/Theme.h"
 
@@ -27,7 +28,7 @@ void drawCenteredText(const char* title, const char* subtitle) {
 void drawPage(AppState page) {
   switch (page) {
     case PAGE_MUSIC:
-      drawCenteredText("MUSIC", "coming soon");
+      drawMusicPage();
       break;
 
     default:

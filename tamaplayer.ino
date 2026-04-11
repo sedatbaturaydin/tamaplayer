@@ -7,16 +7,57 @@
 #include "src/pages/PetPage.h"
 #include "src/pet/PetState.h"
 #include "src/pages/SettingsPage.h"
+#include "src/pages/MusicPage.h"
+#include "src/music/MusicPlayer.h"
 
 AppState currentPage = PAGE_HOME;
 int homeSelectedIndex = 0;
 int settingsSelectedTheme = 0;
 
-bool lastReading = HIGH;
-bool stableButtonState = HIGH;
-unsigned long lastDebounceTime = 0;
-unsigned long pressStartTime = 0;
-bool longPressHandled = false;
+// --- Buton debounce yardımcısı ---
+
+struct BtnState {
+  bool lastReading  = HIGH;
+  bool stable       = HIGH;
+  unsigned long debounceAt = 0;
+  unsigned long pressedAt  = 0;
+  bool longHandled  = false;
+};
+
+BtnState btnUp, btnSelect, btnDown;
+
+// Her frame çağrılır. shortPress / longPress flag'lerini doldurur.
+void updateBtn(BtnState &b, uint8_t pin, bool &shortPress, bool &longPress) {
+  shortPress = false;
+  longPress  = false;
+
+  bool reading = digitalRead(pin);
+
+  if (reading != b.lastReading) b.debounceAt = millis();
+
+  if ((millis() - b.debounceAt) > DEBOUNCE_DELAY) {
+    if (reading != b.stable) {
+      b.stable = reading;
+      if (b.stable == LOW) {
+        b.pressedAt  = millis();
+        b.longHandled = false;
+      } else {
+        if (!b.longHandled) shortPress = true;
+      }
+    }
+  }
+
+  if (b.stable == LOW && !b.longHandled) {
+    if (millis() - b.pressedAt >= LONG_PRESS_TIME) {
+      b.longHandled = true;
+      longPress = true;
+    }
+  }
+
+  b.lastReading = reading;
+}
+
+// --- Sayfa render ---
 
 void renderCurrentPage() {
   if (currentPage == PAGE_HOME) {
@@ -40,86 +81,100 @@ AppState menuIndexToPage(int index) {
   }
 }
 
-void handleShortPress() {
+// --- Buton olayları ---
+
+void handleUp() {
+  if (currentPage == PAGE_HOME) {
+    homeSelectedIndex = (homeSelectedIndex - 1 + getHomeMenuCount()) % getHomeMenuCount();
+    drawHomePage(homeSelectedIndex);
+  } else if (currentPage == PAGE_SETTINGS) {
+    settingsSelectedTheme = (settingsSelectedTheme - 1 + THEME_COUNT) % THEME_COUNT;
+    drawSettingsPage(settingsSelectedTheme);
+  } else if (currentPage == PAGE_MUSIC) {
+    musicPrev();
+  }
+}
+
+void handleDown() {
   if (currentPage == PAGE_HOME) {
     homeSelectedIndex = (homeSelectedIndex + 1) % getHomeMenuCount();
     drawHomePage(homeSelectedIndex);
-  } else if (currentPage == PAGE_PET) {
-    petHandleAction(PET_ACTION_INTERACT);
-    // redraw handled in loop()
   } else if (currentPage == PAGE_SETTINGS) {
     settingsSelectedTheme = (settingsSelectedTheme + 1) % THEME_COUNT;
     drawSettingsPage(settingsSelectedTheme);
+  } else if (currentPage == PAGE_MUSIC) {
+    musicNext();
   }
 }
 
-void handleLongPress() {
+void handleSelect() {
   if (currentPage == PAGE_HOME) {
     AppState next = menuIndexToPage(homeSelectedIndex);
-    if (next == PAGE_SETTINGS) {
-      settingsSelectedTheme = currentThemeIndex;
-    }
+    if (next == PAGE_SETTINGS) settingsSelectedTheme = currentThemeIndex;
     currentPage = next;
-  } else {
-    if (currentPage == PAGE_SETTINGS) {
-      applyTheme(settingsSelectedTheme);
-    }
+    renderCurrentPage();
+  } else if (currentPage == PAGE_PET) {
+    petHandleAction(PET_ACTION_INTERACT);
+  } else if (currentPage == PAGE_MUSIC) {
+    musicTogglePlay();
+  }
+}
+
+void handleBack() {
+  if (currentPage == PAGE_SETTINGS) {
+    applyTheme(settingsSelectedTheme);
+  }
+  if (currentPage != PAGE_HOME) {
     currentPage = PAGE_HOME;
+    renderCurrentPage();
   }
-
-  renderCurrentPage();
 }
 
-void updateButton() {
-  bool reading = digitalRead(BUTTON_PIN);
-
-  if (reading != lastReading) {
-    lastDebounceTime = millis();
-  }
-
-  if ((millis() - lastDebounceTime) > DEBOUNCE_DELAY) {
-    if (reading != stableButtonState) {
-      stableButtonState = reading;
-
-      if (stableButtonState == LOW) {
-        pressStartTime = millis();
-        longPressHandled = false;
-      } else {
-        if (!longPressHandled) {
-          handleShortPress();
-        }
-      }
-    }
-  }
-
-  if (stableButtonState == LOW && !longPressHandled) {
-    if (millis() - pressStartTime >= LONG_PRESS_TIME) {
-      longPressHandled = true;
-      handleLongPress();
-    }
-  }
-
-  lastReading = reading;
-}
+// --- Arduino setup / loop ---
 
 void setup() {
   Serial.begin(115200);
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  pinMode(BTN_UP,     INPUT_PULLUP);
+  pinMode(BTN_SELECT, INPUT_PULLUP);
+  pinMode(BTN_DOWN,   INPUT_PULLUP);
 
   petInit();
+  musicInit();
   initDisplay();
   renderCurrentPage();
 }
 
 void loop() {
-  updateButton();
+  bool shortPress, longPress;
 
-  // Pet stats decay regardless of which page is visible
+  updateBtn(btnUp, BTN_UP, shortPress, longPress);
+  if (shortPress || longPress) handleUp();
+
+  updateBtn(btnDown, BTN_DOWN, shortPress, longPress);
+  if (shortPress || longPress) handleDown();
+
+  updateBtn(btnSelect, BTN_SELECT, shortPress, longPress);
+  if (shortPress) handleSelect();
+  if (longPress)  handleBack();
+
   petUpdate();
+  musicUpdate();
 
-  // Redraw pet page if stats changed while it's open
   if (currentPage == PAGE_PET && petNeedsRedraw()) {
     drawPetPage();
     petClearRedrawFlag();
+  }
+
+  if (currentPage == PAGE_MUSIC) {
+    MusicRedraw r       = musicRedrawNeeded();
+    bool        scrolled = musicPageScrollTick();
+
+    if (r == MUSIC_REDRAW_FULL) {
+      drawMusicPage();
+      musicClearRedrawFlag();
+    } else if (r == MUSIC_REDRAW_PARTIAL || scrolled) {
+      drawMusicPagePartial();
+      musicClearRedrawFlag();
+    }
   }
 }

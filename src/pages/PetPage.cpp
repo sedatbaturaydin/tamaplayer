@@ -125,7 +125,7 @@ static void drawStatBar(int x, int y, const char* label, uint8_t value, uint8_t 
   tft.print(label);
 
   int barX  = x + 24;
-  int barW  = 88;
+  int barW  = SCREEN_W - x - 32; // portrait: 128-8-32=88, landscape: 160-8-32=120
   int fillW = (value * (barW - 2)) / maxVal;
 
   tft.drawRect(barX, y - 1, barW, 8, activeTheme->dim);
@@ -139,15 +139,19 @@ static void drawStatBar(int x, int y, const char* label, uint8_t value, uint8_t 
 void drawPetPage() {
   tft.fillScreen(activeTheme->bg);
 
-  // Title
+  // Kedi merkezi: ekranın ortasına göre konumlandırılır
+  const int CX = SCREEN_W / 2;
+  const int CY = SCREEN_H / 2 - 2; // portrait:78, landscape:62
+
+  // Başlık ("PET" = 18px)
   tft.setTextSize(1);
   tft.setTextColor(activeTheme->light);
-  tft.setCursor(52, 10);
+  tft.setCursor((SCREEN_W - 18) / 2, PH(10));
   tft.println("PET");
-  tft.drawFastHLine(10, 22, 108, activeTheme->accent);
+  tft.drawFastHLine(PW(10), PH(22), SCREEN_W - PW(20), activeTheme->accent);
 
   PetMood mood = petGetMood();
-  drawCat(64, 70, mood);
+  drawCat(CX, CY, mood);
 
   // Mood label
   const char* moodText;
@@ -159,15 +163,15 @@ void drawPetPage() {
   }
   int mw = strlen(moodText) * 6;
   tft.setTextColor(activeTheme->dim);
-  tft.setCursor((128 - mw) / 2, 102);
+  tft.setCursor((SCREEN_W - mw) / 2, CY + 26);
   tft.println(moodText);
 
-  // Stat bars
-  drawStatBar(8, 118, "hun", 10 - petStats.hunger,  10);
-  drawStatBar(8, 132, "hpy", petStats.happiness,     10);
+  // Stat bars (CY+36 ve CY+50 — cat radius=22, +14px boşluk)
+  drawStatBar(PW(8), CY + 36, "hun", 10 - petStats.hunger, 10);
+  drawStatBar(PW(8), CY + 50, "hpy", petStats.happiness,   10);
 
   // Hint
   tft.setTextColor(activeTheme->dim);
-  tft.setCursor(20, 150);
+  tft.setCursor(PW(20), SCREEN_H - 8);
   tft.println("press: interact");
 }
