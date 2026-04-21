@@ -33,3 +33,8 @@
 // Buton timing
 #define DEBOUNCE_DELAY 50
 #define LONG_PRESS_TIME 700
+
+// DFPlayer Mini (UART)
+#define DFP_RX     40   // ESP32 RX <- DFPlayer TX
+#define DFP_TX     41   // ESP32 TX -> DFPlayer RX
+#define DFP_VOLUME 28   // 0-30

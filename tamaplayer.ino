@@ -138,10 +138,10 @@ void setup() {
   pinMode(BTN_SELECT, INPUT_PULLUP);
   pinMode(BTN_DOWN,   INPUT_PULLUP);
 
-  petInit();
-  musicInit();
   initDisplay();
   renderCurrentPage();
+  petInit();
+  musicInit();
 }
 
 void loop() {
@@ -166,13 +166,11 @@ void loop() {
   }
 
   if (currentPage == PAGE_MUSIC) {
-    MusicRedraw r       = musicRedrawNeeded();
-    bool        scrolled = musicPageScrollTick();
-
+    MusicRedraw r = musicRedrawNeeded();
     if (r == MUSIC_REDRAW_FULL) {
       drawMusicPage();
       musicClearRedrawFlag();
-    } else if (r == MUSIC_REDRAW_PARTIAL || scrolled) {
+    } else if (r == MUSIC_REDRAW_PARTIAL) {
       drawMusicPagePartial();
       musicClearRedrawFlag();
     }
