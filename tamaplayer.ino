@@ -24,7 +24,7 @@ struct BtnState {
   bool longHandled  = false;
 };
 
-BtnState btnUp, btnSelect, btnDown;
+BtnState btnUp, btnSelect, btnDown, btnBack;
 
 // Her frame çağrılır. shortPress / longPress flag'lerini doldurur.
 void updateBtn(BtnState &b, uint8_t pin, bool &shortPress, bool &longPress) {
@@ -115,9 +115,8 @@ void handleSelect() {
     renderCurrentPage();
   } else if (currentPage == PAGE_PET) {
     petHandleAction(PET_ACTION_INTERACT);
-  } else if (currentPage == PAGE_MUSIC) {
-    musicTogglePlay();
   }
+  // PAGE_MUSIC: secim su an oynatma baglamadigindan no-op
 }
 
 void handleBack() {
@@ -137,6 +136,7 @@ void setup() {
   pinMode(BTN_UP,     INPUT_PULLUP);
   pinMode(BTN_SELECT, INPUT_PULLUP);
   pinMode(BTN_DOWN,   INPUT_PULLUP);
+  pinMode(BTN_BACK,   INPUT_PULLUP);
 
   initDisplay();
   renderCurrentPage();
@@ -155,7 +155,9 @@ void loop() {
 
   updateBtn(btnSelect, BTN_SELECT, shortPress, longPress);
   if (shortPress) handleSelect();
-  if (longPress)  handleBack();
+
+  updateBtn(btnBack, BTN_BACK, shortPress, longPress);
+  if (shortPress || longPress) handleBack();
 
   petUpdate();
   musicUpdate();

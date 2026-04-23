@@ -6,100 +6,109 @@
 #include <stdio.h>
 #include <Arduino.h>
 
-static int centerX(const char* text, uint8_t size) {
-  return (SCREEN_W - (int)strlen(text) * 6 * size) / 2;
+static const int LIST_TOP     = 26;    // baslik altindan sonra ilk satir
+static const int LIST_ROW_H   = 12;    // satir yuksekligi (px)
+static const int LIST_PAD_X   = 6;     // sol/sag padding
+static const int LIST_CHARS   = 18;    // bir satirda max karakter (128px / 6 ~= 21, marj icin 18)
+
+static int _visibleRows() {
+  int h = SCREEN_H - LIST_TOP - 10;  // alt kenarda 10px bosluk
+  int n = h / LIST_ROW_H;
+  if (n < 1) n = 1;
+  return n;
 }
 
-static void drawNote(int x, int y, uint16_t color) {
-  tft.fillCircle(x,     y + 8, 3, color);
-  tft.fillCircle(x + 9, y + 6, 3, color);
-  tft.drawFastVLine(x + 3,  y,     9, color);
-  tft.drawFastVLine(x + 12, y - 2, 9, color);
-  tft.drawFastHLine(x + 3,  y,    10, color);
+static int _scrollOffset(int selected, int total) {
+  int rows = _visibleRows();
+  if (total <= rows) return 0;
+  int off = selected - rows / 2;
+  if (off < 0) off = 0;
+  if (off > total - rows) off = total - rows;
+  return off;
 }
 
-static void drawStatus() {
+static void drawHeader() {
+  tft.setTextSize(1);
+  tft.setTextColor(activeTheme->light, activeTheme->bg);
+  tft.setCursor(PW(6), PH(8));
+  tft.print("MUSIC");
+
   int total = musicTrackCount();
+  char counter[12];
+  if (total == 0) snprintf(counter, sizeof(counter), "--");
+  else            snprintf(counter, sizeof(counter), "%d/%d", musicIndex + 1, total);
+  tft.setTextColor(activeTheme->dim, activeTheme->bg);
+  int w = (int)strlen(counter) * 6;
+  tft.setCursor(SCREEN_W - PW(6) - w, PH(8));
+  tft.print(counter);
 
-  const char* statusStr;
-  uint16_t    color;
+  tft.drawFastHLine(PW(6), PH(20), SCREEN_W - PW(12), activeTheme->accent);
+}
+
+static void truncName(const char* src, char* dst, int maxChars) {
+  int n = (int)strlen(src);
+  if (n <= maxChars) { strcpy(dst, src); return; }
+  // son "..." ile kes
+  int keep = maxChars - 3;
+  if (keep < 1) keep = 1;
+  memcpy(dst, src, keep);
+  dst[keep]     = '.';
+  dst[keep + 1] = '.';
+  dst[keep + 2] = '.';
+  dst[keep + 3] = '\0';
+}
+
+static void drawList() {
+  int total = musicTrackCount();
+  int rows  = _visibleRows();
+  int off   = _scrollOffset(musicIndex, total);
+
+  // liste alanini temizle
+  tft.fillRect(0, LIST_TOP, SCREEN_W, rows * LIST_ROW_H, activeTheme->bg);
+
   if (total == 0) {
-    statusStr = "NO SD?";
-    color     = activeTheme->dim;
-  } else if (musicPlaying) {
-    statusStr = "> PLAYING";
-    color     = activeTheme->accent;
-  } else {
-    statusStr = "|| PAUSED";
-    color     = activeTheme->dim;
+    const char* msg = musicSdOk() ? "No MP3 files" : "No SD card";
+    tft.setTextSize(1);
+    tft.setTextColor(activeTheme->dim, activeTheme->bg);
+    int w = (int)strlen(msg) * 6;
+    tft.setCursor((SCREEN_W - w) / 2, LIST_TOP + 20);
+    tft.print(msg);
+    return;
   }
 
-  int y = PH(100);
-  tft.fillRect(0, y, SCREEN_W, 20, activeTheme->bg);
   tft.setTextSize(1);
-  tft.setTextColor(color, activeTheme->bg);
-  tft.setCursor(centerX(statusStr, 1), y);
-  tft.print(statusStr);
+  char line[LIST_CHARS + 4];
 
-  // DFPlayer'in bildirdigi gercek durum (debug)
-  int st   = musicActualState();
-  int file = musicActualFileNum();
-  char buf[24];
-  const char* stStr = (st == 1) ? "PLAY" : (st == 2) ? "PAUSE" : (st == 0) ? "STOP" : "?";
-  snprintf(buf, sizeof(buf), "DFP: %s #%d", stStr, file);
-  tft.setTextColor(activeTheme->dim, activeTheme->bg);
-  tft.setCursor(centerX(buf, 1), y + 10);
-  tft.print(buf);
+  for (int i = 0; i < rows && (off + i) < total; i++) {
+    int idx = off + i;
+    int y   = LIST_TOP + i * LIST_ROW_H;
+    bool selected = (idx == musicIndex);
+
+    uint16_t fg, bg;
+    if (selected) {
+      fg = activeTheme->bg;
+      bg = activeTheme->accent;
+      tft.fillRect(LIST_PAD_X - 2, y - 1, SCREEN_W - 2 * (LIST_PAD_X - 2), LIST_ROW_H, bg);
+    } else {
+      fg = activeTheme->light;
+      bg = activeTheme->bg;
+    }
+
+    truncName(musicTrackName(idx), line, LIST_CHARS);
+    tft.setTextColor(fg, bg);
+    tft.setCursor(LIST_PAD_X, y + 2);
+    tft.print(line);
+  }
 }
 
 void drawMusicPage() {
-  int total = musicTrackCount();
   tft.fillScreen(activeTheme->bg);
-
-  // Ust baslik
-  drawNote(PW(10), PH(4), activeTheme->accent);
-  tft.setTextSize(1);
-  tft.setTextColor(activeTheme->light, activeTheme->bg);
-  tft.setCursor(PW(28), PH(8));
-  tft.print("MUSIC");
-  tft.drawFastHLine(PW(6), PH(20), SCREEN_W - PW(12), activeTheme->accent);
-
-  // Parca adi (buyuk)
-  char trackStr[16];
-  if (total == 0) {
-    snprintf(trackStr, sizeof(trackStr), "--");
-  } else {
-    snprintf(trackStr, sizeof(trackStr), "Track %d", musicIndex + 1);
-  }
-  tft.setTextSize(2);
-  tft.setTextColor(activeTheme->light, activeTheme->bg);
-  tft.setCursor(centerX(trackStr, 2), PH(50));
-  tft.print(trackStr);
-
-  // Counter
-  char counter[12];
-  if (total == 0) {
-    snprintf(counter, sizeof(counter), "0 / 0");
-  } else {
-    snprintf(counter, sizeof(counter), "%d / %d", musicIndex + 1, total);
-  }
-  tft.setTextSize(1);
-  tft.setTextColor(activeTheme->dim, activeTheme->bg);
-  tft.setCursor(centerX(counter, 1), PH(78));
-  tft.print(counter);
-
-  // Status
-  drawStatus();
-
-  // Alt bilgi
-  tft.drawFastHLine(PW(6), PH(128), SCREEN_W - PW(12), activeTheme->dim);
-  tft.setTextColor(activeTheme->dim, activeTheme->bg);
-  tft.setCursor(PW(4),          PH(138)); tft.print("|< prev");
-  tft.setCursor(SCREEN_W - PW(52), PH(138)); tft.print("next >|");
-  tft.setCursor(centerX("[ ] play/pause", 1), PH(150));
-  tft.print("[ ] play/pause");
+  drawHeader();
+  drawList();
 }
 
 void drawMusicPagePartial() {
-  drawStatus();
+  // secim degisti: basligin sag tarafindaki counter + liste yenile
+  drawHeader();
+  drawList();
 }
