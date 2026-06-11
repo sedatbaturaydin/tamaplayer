@@ -28,6 +28,9 @@ static int _scrollOffset(int selected, int total) {
 }
 
 static void drawHeader() {
+  // baslik bandini temizle (state/counter degisimlerinde kalinti olmasin)
+  tft.fillRect(0, 0, SCREEN_W, PH(20), activeTheme->bg);
+
   tft.setTextSize(1);
   tft.setTextColor(activeTheme->light, activeTheme->bg);
   tft.setCursor(PW(6), PH(8));
@@ -37,10 +40,18 @@ static void drawHeader() {
   char counter[12];
   if (total == 0) snprintf(counter, sizeof(counter), "--");
   else            snprintf(counter, sizeof(counter), "%d/%d", musicIndex + 1, total);
+  int counterW = (int)strlen(counter) * 6;
   tft.setTextColor(activeTheme->dim, activeTheme->bg);
-  int w = (int)strlen(counter) * 6;
-  tft.setCursor(SCREEN_W - PW(6) - w, PH(8));
+  tft.setCursor(SCREEN_W - PW(6) - counterW, PH(8));
   tft.print(counter);
+
+  // play/pause gostergesi counter'in solunda
+  const char* state = musicIsPlaying() ? ">" : "||";
+  int stateW = (int)strlen(state) * 6;
+  tft.setTextColor(musicIsPlaying() ? activeTheme->accent : activeTheme->dim,
+                   activeTheme->bg);
+  tft.setCursor(SCREEN_W - PW(6) - counterW - PW(8) - stateW, PH(8));
+  tft.print(state);
 
   tft.drawFastHLine(PW(6), PH(20), SCREEN_W - PW(12), activeTheme->accent);
 }

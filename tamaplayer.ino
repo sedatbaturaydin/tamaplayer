@@ -14,8 +14,6 @@ AppState currentPage = PAGE_HOME;
 int homeSelectedIndex = 0;
 int settingsSelectedTheme = 0;
 
-// --- Buton debounce yardımcısı ---
-
 struct BtnState {
   bool lastReading  = HIGH;
   bool stable       = HIGH;
@@ -26,7 +24,6 @@ struct BtnState {
 
 BtnState btnUp, btnSelect, btnDown, btnBack;
 
-// Her frame çağrılır. shortPress / longPress flag'lerini doldurur.
 void updateBtn(BtnState &b, uint8_t pin, bool &shortPress, bool &longPress) {
   shortPress = false;
   longPress  = false;
@@ -57,8 +54,6 @@ void updateBtn(BtnState &b, uint8_t pin, bool &shortPress, bool &longPress) {
   b.lastReading = reading;
 }
 
-// --- Sayfa render ---
-
 void renderCurrentPage() {
   if (currentPage == PAGE_HOME) {
     drawHomePage(homeSelectedIndex);
@@ -80,8 +75,6 @@ AppState menuIndexToPage(int index) {
     default: return PAGE_HOME;
   }
 }
-
-// --- Buton olayları ---
 
 void handleUp() {
   if (currentPage == PAGE_HOME) {
@@ -115,8 +108,9 @@ void handleSelect() {
     renderCurrentPage();
   } else if (currentPage == PAGE_PET) {
     petHandleAction(PET_ACTION_INTERACT);
+  } else if (currentPage == PAGE_MUSIC) {
+    musicPlayPause();
   }
-  // PAGE_MUSIC: secim su an oynatma baglamadigindan no-op
 }
 
 void handleBack() {
@@ -129,19 +123,24 @@ void handleBack() {
   }
 }
 
-// --- Arduino setup / loop ---
-
 void setup() {
   Serial.begin(115200);
+  delay(2000);
+  Serial.println();
+  Serial.println("=== TAMAPLAYER BOOT ===");
+  Serial.println("Build: " __DATE__ " " __TIME__);
+
   pinMode(BTN_UP,     INPUT_PULLUP);
   pinMode(BTN_SELECT, INPUT_PULLUP);
   pinMode(BTN_DOWN,   INPUT_PULLUP);
   pinMode(BTN_BACK,   INPUT_PULLUP);
 
   initDisplay();
+  musicInit();
   renderCurrentPage();
   petInit();
-  musicInit();
+
+  Serial.println("[SETUP] tamamlandi");
 }
 
 void loop() {
