@@ -49,4 +49,4 @@
 // MP3 klasoru
 #define MP3_DIR        "/MP3"
 #define MP3_MAX_TRACKS 32
-#define MP3_NAME_MAX   32
+#define MP3_NAME_MAX   64

@@ -1,7 +1,9 @@
 #include "PetPage.h"
 #include "../display/DisplayManager.h"
 #include "../display/Theme.h"
+#include "../display/StatusBar.h"
 #include "../pet/PetState.h"
+#include "../i18n/Strings.h"
 #include <string.h>
 
 static const uint16_t COL_WHITE = 0xFFFF;
@@ -138,40 +140,45 @@ static void drawStatBar(int x, int y, const char* label, uint8_t value, uint8_t 
 
 void drawPetPage() {
   tft.fillScreen(activeTheme->bg);
+  drawStatusBar();
 
-  // Kedi merkezi: ekranın ortasına göre konumlandırılır
   const int CX = SCREEN_W / 2;
-  const int CY = SCREEN_H / 2 - 2; // portrait:78, landscape:62
+  const int CY = SCREEN_H / 2 - 2;
 
-  // Başlık ("PET" = 18px)
+  // Baslik
   tft.setTextSize(1);
   tft.setTextColor(activeTheme->light);
-  tft.setCursor((SCREEN_W - 18) / 2, PH(10));
-  tft.println("PET");
-  tft.drawFastHLine(PW(10), PH(22), SCREEN_W - PW(20), activeTheme->accent);
+  const char* title = T(STR_PET);
+  int tw = (int)strlen(title) * 6;
+  tft.setCursor((SCREEN_W - tw) / 2, PH(18));
+  tft.println(title);
+  tft.drawFastHLine(PW(10), PH(28), SCREEN_W - PW(20), activeTheme->accent);
 
   PetMood mood = petGetMood();
   drawCat(CX, CY, mood);
 
   // Mood label
-  const char* moodText;
+  StringId moodId;
   switch (mood) {
-    case PET_MOOD_HAPPY:   moodText = "happy!";    break;
-    case PET_MOOD_HUNGRY:  moodText = "hungry..."; break;
-    case PET_MOOD_SAD:     moodText = "sad...";    break;
-    default:               moodText = "( - _ - )"; break;
+    case PET_MOOD_HAPPY:   moodId = STR_HAPPY;   break;
+    case PET_MOOD_HUNGRY:  moodId = STR_HUNGRY;  break;
+    case PET_MOOD_SAD:     moodId = STR_SAD;     break;
+    default:               moodId = STR_NEUTRAL; break;
   }
-  int mw = strlen(moodText) * 6;
+  const char* moodText = T(moodId);
+  int mw = (int)strlen(moodText) * 6;
   tft.setTextColor(activeTheme->dim);
   tft.setCursor((SCREEN_W - mw) / 2, CY + 26);
   tft.println(moodText);
 
-  // Stat bars (CY+36 ve CY+50 — cat radius=22, +14px boşluk)
+  // Stat bars
   drawStatBar(PW(8), CY + 36, "hun", 10 - petStats.hunger, 10);
   drawStatBar(PW(8), CY + 50, "hpy", petStats.happiness,   10);
 
   // Hint
+  const char* hint = T(STR_PRESS_INTERACT);
+  int hw = (int)strlen(hint) * 6;
   tft.setTextColor(activeTheme->dim);
-  tft.setCursor(PW(20), SCREEN_H - 8);
-  tft.println("press: interact");
+  tft.setCursor((SCREEN_W - hw) / 2, SCREEN_H - 8);
+  tft.println(hint);
 }

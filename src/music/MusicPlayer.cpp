@@ -1,5 +1,6 @@
 #include "MusicPlayer.h"
 #include "../../Config.h"
+#include "../i18n/Strings.h"
 #include <Arduino.h>
 #include <SPI.h>
 #include <SD.h>
@@ -15,6 +16,15 @@ static bool _sdOk       = false;
 static Audio _audio;
 static bool  _isPlaying  = false;
 static bool  _eofPending = false;
+static int   _playingIndex = -1;
+
+static char _trackTitle[64]  = "";
+static char _trackArtist[64] = "";
+
+static void _clearMeta() {
+  _trackTitle[0]  = '\0';
+  _trackArtist[0] = '\0';
+}
 
 int musicIndex = 0;
 
@@ -70,11 +80,13 @@ static void scanMp3Folder() {
 
 static bool loadCurrentTrack() {
   if (_trackCount == 0) return false;
-  char path[64];
+  char path[128];
   snprintf(path, sizeof(path), "%s/%s", MP3_DIR, _names[musicIndex]);
   _audio.stopSong();
+  _clearMeta();
   bool ok = _audio.connecttoFS(SD, path);
   _isPlaying = ok;
+  if (ok) _playingIndex = musicIndex;
   if (!ok) Serial.printf("[AUDIO] connecttoFS basarisiz: %s\n", path);
   return ok;
 }
@@ -146,6 +158,23 @@ void musicPrev() {
   setRedraw(MUSIC_REDRAW_PARTIAL);
 }
 
+void musicLoadCurrent() {
+  loadCurrentTrack();
+  setRedraw(MUSIC_REDRAW_PARTIAL);
+}
+
+void musicSelectNext() {
+  if (_trackCount == 0) return;
+  musicIndex = (musicIndex + 1) % _trackCount;
+  setRedraw(MUSIC_REDRAW_PARTIAL);
+}
+
+void musicSelectPrev() {
+  if (_trackCount == 0) return;
+  musicIndex = (musicIndex - 1 + _trackCount) % _trackCount;
+  setRedraw(MUSIC_REDRAW_PARTIAL);
+}
+
 void musicPlayPause() {
   if (_trackCount == 0) return;
   if (!_audio.isRunning()) {
@@ -166,6 +195,43 @@ const char* musicTrackName(int idx) {
 
 bool musicSdOk()     { return _sdOk; }
 bool musicIsPlaying(){ return _audio.isRunning(); }
+
+int musicPlayingIndex() { return _playingIndex; }
+
+static int _activeIndex() {
+  // Calan track varsa onu, yoksa secili index'e dus
+  return (_playingIndex >= 0) ? _playingIndex : musicIndex;
+}
+
+const char* musicTitle() {
+  if (_trackTitle[0] != '\0') return _trackTitle;
+  static char fallback[MP3_NAME_MAX];
+  const char* nm = musicTrackName(_activeIndex());
+  strncpy(fallback, nm, sizeof(fallback) - 1);
+  fallback[sizeof(fallback) - 1] = '\0';
+  size_t n = strlen(fallback);
+  if (n > 4 && (strcmp(fallback + n - 4, ".mp3") == 0 ||
+                strcmp(fallback + n - 4, ".MP3") == 0)) {
+    fallback[n - 4] = '\0';
+  }
+  const char* sep = strstr(fallback, " - ");
+  if (sep) return sep + 3;
+  return fallback;
+}
+const char* musicArtist() {
+  if (_trackArtist[0] != '\0') return _trackArtist;
+  static char fallback[MP3_NAME_MAX];
+  const char* nm = musicTrackName(_activeIndex());
+  const char* sep = strstr(nm, " - ");
+  if (!sep) return "";
+  size_t len = sep - nm;
+  if (len >= sizeof(fallback)) len = sizeof(fallback) - 1;
+  memcpy(fallback, nm, len);
+  fallback[len] = '\0';
+  return fallback;
+}
+uint32_t musicCurrentSec() { return _audio.getAudioCurrentTime(); }
+uint32_t musicTotalSec()   { return _audio.getAudioFileDuration(); }
 
 bool musicTryLoadFirst() {
   if (_trackCount == 0) return false;
@@ -191,6 +257,15 @@ void audio_info(const char* info) {
 void audio_id3data(const char* info) {
   Serial.print("[id3] ");
   Serial.println(info);
+
+  // Library "Title: ..." / "Artist: ..." formatinda gonderir
+  if (strncmp(info, "Title: ", 7) == 0) {
+    strncpy(_trackTitle, info + 7, sizeof(_trackTitle) - 1);
+    _trackTitle[sizeof(_trackTitle) - 1] = '\0';
+  } else if (strncmp(info, "Artist: ", 8) == 0) {
+    strncpy(_trackArtist, info + 8, sizeof(_trackArtist) - 1);
+    _trackArtist[sizeof(_trackArtist) - 1] = '\0';
+  }
 }
 void audio_bitrate(const char* info) {
   Serial.print("[bitrate] ");

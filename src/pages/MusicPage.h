@@ -1,4 +1,12 @@
 #pragma once
 
-void drawMusicPage();         // tam ekran (parca degisimi / ilk giris)
-void drawMusicPagePartial();  // sadece status satiri (play/pause)
+enum MusicView {
+  MUSIC_VIEW_LIST,
+  MUSIC_VIEW_PLAYING
+};
+
+void musicPageSetView(MusicView v);
+MusicView musicPageGetView();
+
+void drawMusicPage();          // tam ekran
+void drawMusicPagePartial();   // partial redraw (progress, state)

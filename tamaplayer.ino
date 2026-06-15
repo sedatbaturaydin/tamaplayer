@@ -9,10 +9,10 @@
 #include "src/pages/SettingsPage.h"
 #include "src/pages/MusicPage.h"
 #include "src/music/MusicPlayer.h"
+#include "src/i18n/Strings.h"
 
 AppState currentPage = PAGE_HOME;
 int homeSelectedIndex = 0;
-int settingsSelectedTheme = 0;
 
 struct BtnState {
   bool lastReading  = HIGH;
@@ -61,7 +61,7 @@ void renderCurrentPage() {
     drawPetPage();
     petClearRedrawFlag();
   } else if (currentPage == PAGE_SETTINGS) {
-    drawSettingsPage(settingsSelectedTheme);
+    drawSettingsPage();
   } else {
     drawPage(currentPage);
   }
@@ -81,10 +81,13 @@ void handleUp() {
     homeSelectedIndex = (homeSelectedIndex - 1 + getHomeMenuCount()) % getHomeMenuCount();
     drawHomePage(homeSelectedIndex);
   } else if (currentPage == PAGE_SETTINGS) {
-    settingsSelectedTheme = (settingsSelectedTheme - 1 + THEME_COUNT) % THEME_COUNT;
-    drawSettingsPage(settingsSelectedTheme);
+    settingsHandleUp();
   } else if (currentPage == PAGE_MUSIC) {
-    musicPrev();
+    if (musicPageGetView() == MUSIC_VIEW_LIST) {
+      musicSelectPrev();   // sadece secim degisir
+    } else {
+      musicPrev();         // playing: yeni track calsin
+    }
   }
 }
 
@@ -93,29 +96,52 @@ void handleDown() {
     homeSelectedIndex = (homeSelectedIndex + 1) % getHomeMenuCount();
     drawHomePage(homeSelectedIndex);
   } else if (currentPage == PAGE_SETTINGS) {
-    settingsSelectedTheme = (settingsSelectedTheme + 1) % THEME_COUNT;
-    drawSettingsPage(settingsSelectedTheme);
+    settingsHandleDown();
   } else if (currentPage == PAGE_MUSIC) {
-    musicNext();
+    if (musicPageGetView() == MUSIC_VIEW_LIST) {
+      musicSelectNext();
+    } else {
+      musicNext();
+    }
   }
 }
 
 void handleSelect() {
   if (currentPage == PAGE_HOME) {
     AppState next = menuIndexToPage(homeSelectedIndex);
-    if (next == PAGE_SETTINGS) settingsSelectedTheme = currentThemeIndex;
+    if (next == PAGE_SETTINGS) settingsEnter();
+    if (next == PAGE_MUSIC) {
+      // Calan track varsa list imlecini ona hizala
+      int p = musicPlayingIndex();
+      if (p >= 0) musicIndex = p;
+      musicPageSetView(musicIsPlaying() ? MUSIC_VIEW_PLAYING : MUSIC_VIEW_LIST);
+    }
     currentPage = next;
     renderCurrentPage();
   } else if (currentPage == PAGE_PET) {
     petHandleAction(PET_ACTION_INTERACT);
   } else if (currentPage == PAGE_MUSIC) {
-    musicPlayPause();
+    if (musicPageGetView() == MUSIC_VIEW_LIST) {
+      musicLoadCurrent();              // secili track'i yukle ve cal
+      musicPageSetView(MUSIC_VIEW_PLAYING);
+      drawMusicPage();
+    } else {
+      musicPlayPause();                // playing: pause/resume
+    }
+  } else if (currentPage == PAGE_SETTINGS) {
+    settingsHandleSelect();
   }
 }
 
 void handleBack() {
   if (currentPage == PAGE_SETTINGS) {
-    applyTheme(settingsSelectedTheme);
+    if (!settingsHandleBack()) return;  // ic ekran arasinda kaldi
+  } else if (currentPage == PAGE_MUSIC) {
+    if (musicPageGetView() == MUSIC_VIEW_PLAYING) {
+      musicPageSetView(MUSIC_VIEW_LIST);
+      drawMusicPage();
+      return;
+    }
   }
   if (currentPage != PAGE_HOME) {
     currentPage = PAGE_HOME;
@@ -136,7 +162,27 @@ void setup() {
   pinMode(BTN_BACK,   INPUT_PULLUP);
 
   initDisplay();
+
+  // Boot splash
+  tft.fillScreen(activeTheme->bg);
+  const char* brand = "tamaplayer";
+  const char* loading = T(STR_LOADING);
+  int bw = (int)strlen(brand) * 6 * 2;
+  int lw = (int)strlen(loading) * 6;
+  tft.setTextSize(2);
+  tft.setTextColor(activeTheme->accent, activeTheme->bg);
+  tft.setCursor((SCREEN_W - bw) / 2, SCREEN_H / 2 - 14);
+  tft.print(brand);
+  tft.setTextSize(1);
+  tft.setTextColor(activeTheme->dim, activeTheme->bg);
+  tft.setCursor((SCREEN_W - lw) / 2, SCREEN_H / 2 + 12);
+  tft.print(loading);
+
+  unsigned long splashStart = millis();
   musicInit();
+  unsigned long elapsed = millis() - splashStart;
+  if (elapsed < 1500) delay(1500 - elapsed);
+
   renderCurrentPage();
   petInit();
 
@@ -174,6 +220,13 @@ void loop() {
     } else if (r == MUSIC_REDRAW_PARTIAL) {
       drawMusicPagePartial();
       musicClearRedrawFlag();
+    }
+
+    // Playing view: progress + zamani periyodik tazele
+    static unsigned long lastTick = 0;
+    if (musicPageGetView() == MUSIC_VIEW_PLAYING && millis() - lastTick > 500) {
+      lastTick = millis();
+      drawMusicPagePartial();
     }
   }
 }

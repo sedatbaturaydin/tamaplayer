@@ -10,7 +10,7 @@ struct Theme {
   uint16_t onAccent; // text on top of accent-colored fills
 };
 
-#define THEME_COUNT 3
+#define THEME_COUNT 4
 
 extern const Theme THEMES[THEME_COUNT];
 extern const Theme* activeTheme;
